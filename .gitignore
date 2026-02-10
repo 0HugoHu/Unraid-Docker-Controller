@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build outputs
+frontend/dist/
+internal/api/static/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test
+*.test
+*.out
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+/data/
+*.db
+
+# Logs
+*.log
+
+# Local settings
+.claude/

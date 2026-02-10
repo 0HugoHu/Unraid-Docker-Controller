@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  nas-controller:
+    build: .
+    container_name: nas-controller
+    restart: unless-stopped
+    ports:
+      - "13000:13000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - nas-controller-data:/data
+    environment:
+      - TZ=UTC
+
+volumes:
+  nas-controller-data:
