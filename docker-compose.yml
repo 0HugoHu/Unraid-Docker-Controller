@@ -1,8 +1,7 @@
-version: '3.8'
-
 services:
   nas-controller:
     build: .
+    image: nas-controller:latest
     container_name: nas-controller
     restart: unless-stopped
     ports:
