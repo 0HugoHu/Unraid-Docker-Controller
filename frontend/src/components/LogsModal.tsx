@@ -63,7 +63,7 @@ export default function LogsModal({ appId, onClose }: LogsModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-4xl h-[80vh] flex flex-col">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-4xl h-[80vh] flex flex-col border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-semibold">Logs</h2>
@@ -72,7 +72,7 @@ export default function LogsModal({ appId, onClose }: LogsModalProps) {
                 onClick={() => setTab('container')}
                 className={`px-3 py-1 text-sm rounded-md transition-colors ${
                   tab === 'container'
-                    ? 'bg-white dark:bg-gray-600 shadow-sm'
+                    ? 'bg-white dark:bg-gray-600 shadow-sm font-medium'
                     : 'text-gray-500'
                 }`}
               >
@@ -82,7 +82,7 @@ export default function LogsModal({ appId, onClose }: LogsModalProps) {
                 onClick={() => setTab('build')}
                 className={`px-3 py-1 text-sm rounded-md transition-colors ${
                   tab === 'build'
-                    ? 'bg-white dark:bg-gray-600 shadow-sm'
+                    ? 'bg-white dark:bg-gray-600 shadow-sm font-medium'
                     : 'text-gray-500'
                 }`}
               >
@@ -90,31 +90,31 @@ export default function LogsModal({ appId, onClose }: LogsModalProps) {
               </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
               onClick={fetchLogs}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               title="Refresh"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
             <button
               onClick={handleDownload}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               title="Download"
             >
               <Download className="w-4 h-4" />
             </button>
             <button
               onClick={handleClear}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-red-500"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
               title="Clear"
             >
               <Trash2 className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400"
             >
               <X className="w-5 h-5" />
             </button>
@@ -122,7 +122,7 @@ export default function LogsModal({ appId, onClose }: LogsModalProps) {
         </div>
 
         <div className="flex items-center gap-4 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-sm text-gray-500">
             <input
               type="checkbox"
               checked={autoScroll}
@@ -136,7 +136,7 @@ export default function LogsModal({ appId, onClose }: LogsModalProps) {
         <div className="flex-1 overflow-auto p-4 bg-gray-900">
           {isLoading ? (
             <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-500"></div>
             </div>
           ) : logs ? (
             <pre className="log-viewer text-gray-100 whitespace-pre-wrap break-words">

@@ -164,6 +164,48 @@ func (s *GitService) extractSlug(repoURL string) string {
 	return ""
 }
 
+type UpdateCheckResult struct {
+	HasUpdate    bool   `json:"hasUpdate"`
+	LocalCommit  string `json:"localCommit"`
+	RemoteCommit string `json:"remoteCommit"`
+}
+
+func (s *GitService) CheckForUpdates(slug string, branch string) (*UpdateCheckResult, error) {
+	repoPath := filepath.Join(s.reposDir, slug)
+
+	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("repository not found")
+	}
+
+	// Get local HEAD
+	cmd := exec.Command("git", "-C", repoPath, "rev-parse", "HEAD")
+	localOutput, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get local commit: %v", err)
+	}
+	localCommit := strings.TrimSpace(string(localOutput))
+
+	// Fetch remote
+	cmd = exec.Command("git", "-C", repoPath, "fetch", "origin", branch)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("git fetch failed: %s", string(output))
+	}
+
+	// Get remote HEAD
+	cmd = exec.Command("git", "-C", repoPath, "rev-parse", fmt.Sprintf("origin/%s", branch))
+	remoteOutput, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get remote commit: %v", err)
+	}
+	remoteCommit := strings.TrimSpace(string(remoteOutput))
+
+	return &UpdateCheckResult{
+		HasUpdate:    localCommit != remoteCommit,
+		LocalCommit:  localCommit[:8],
+		RemoteCommit: remoteCommit[:8],
+	}, nil
+}
+
 func (s *GitService) GetReposSize() (int64, error) {
 	var size int64
 	err := filepath.Walk(s.reposDir, func(path string, info os.FileInfo, err error) error {

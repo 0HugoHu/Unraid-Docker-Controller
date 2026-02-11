@@ -83,6 +83,7 @@ func NewRouter(
 			protected.POST("/apps/:id/stop", appHandler.StopApp)
 			protected.POST("/apps/:id/restart", appHandler.RestartApp)
 			protected.POST("/apps/:id/pull", appHandler.PullAndRebuild)
+			protected.GET("/apps/:id/check-update", appHandler.CheckUpdate)
 
 			// Logs
 			protected.GET("/apps/:id/logs", appHandler.GetLogs)
@@ -95,6 +96,8 @@ func NewRouter(
 			protected.GET("/system/ports", systemHandler.GetPorts)
 			protected.POST("/system/prune", systemHandler.PruneImages)
 			protected.DELETE("/system/logs", systemHandler.ClearAllLogs)
+			protected.POST("/system/check-update", systemHandler.CheckSelfUpdate)
+			protected.POST("/system/self-update", systemHandler.SelfUpdate)
 		}
 
 		// WebSocket routes (auth via query param)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strconv"
 	"time"
 
@@ -291,4 +292,9 @@ func (c *Client) GetContainerUptime(ctx context.Context, containerID string) (st
 		return fmt.Sprintf("%dh %dm", hours, minutes), nil
 	}
 	return fmt.Sprintf("%dm", minutes), nil
+}
+
+func (c *Client) InspectSelf(ctx context.Context) (types.ContainerJSON, error) {
+	hostname, _ := os.Hostname() // Container ID in Docker
+	return c.cli.ContainerInspect(ctx, hostname)
 }

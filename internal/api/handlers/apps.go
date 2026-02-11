@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -118,6 +119,19 @@ func (h *AppHandler) CreateApp(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Auto-trigger build and start in background
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+		if err := h.appManager.BuildApp(ctx, app.ID, nil); err != nil {
+			log.Printf("Auto-build failed for %s: %v", app.Name, err)
+			return
+		}
+		if err := h.appManager.StartApp(ctx, app.ID); err != nil {
+			log.Printf("Auto-start failed for %s: %v", app.Name, err)
+		}
+	}()
 
 	c.JSON(http.StatusCreated, app)
 }
@@ -244,6 +258,18 @@ func (h *AppHandler) PullAndRebuild(c *gin.Context) {
 	}()
 
 	c.JSON(http.StatusAccepted, gin.H{"message": "pull and rebuild started"})
+}
+
+func (h *AppHandler) CheckUpdate(c *gin.Context) {
+	id := c.Param("id")
+
+	result, err := h.appManager.CheckAppUpdate(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 func (h *AppHandler) GetLogs(c *gin.Context) {

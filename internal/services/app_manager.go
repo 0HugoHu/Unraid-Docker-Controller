@@ -312,6 +312,13 @@ func (m *AppManager) PullAndRebuild(ctx context.Context, appID string, progressC
 		return fmt.Errorf("app not found: %v", err)
 	}
 
+	wasRunning := app.Status == models.StatusRunning
+
+	// Stop container if running (must stop before rebuild to free the container name)
+	if wasRunning {
+		m.StopApp(ctx, appID)
+	}
+
 	// Pull latest changes
 	commit, err := m.gitService.PullRepo(app.Slug, app.Branch)
 	if err != nil {
@@ -324,7 +331,23 @@ func (m *AppManager) PullAndRebuild(ctx context.Context, appID string, progressC
 	m.db.UpdateApp(app)
 
 	// Rebuild
-	return m.BuildApp(ctx, appID, progressChan)
+	if err := m.BuildApp(ctx, appID, progressChan); err != nil {
+		return err
+	}
+
+	// Auto-restart if was running
+	if wasRunning {
+		return m.StartApp(ctx, appID)
+	}
+	return nil
+}
+
+func (m *AppManager) CheckAppUpdate(appID string) (*UpdateCheckResult, error) {
+	app, err := m.db.GetApp(appID)
+	if err != nil {
+		return nil, fmt.Errorf("app not found: %v", err)
+	}
+	return m.gitService.CheckForUpdates(app.Slug, app.Branch)
 }
 
 func (m *AppManager) GetApp(appID string) (*models.App, error) {

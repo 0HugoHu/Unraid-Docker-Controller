@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, LogOut } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, LogOut, RefreshCw } from 'lucide-react';
 import { api, StorageInfo } from '../api/client';
 
 interface SettingsProps {
@@ -24,9 +24,17 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
   const [storage, setStorage] = useState<StorageInfo | null>(null);
   const [isPruning, setIsPruning] = useState(false);
   const [isClearingLogs, setIsClearingLogs] = useState(false);
+  const [updateRepoUrl, setUpdateRepoUrl] = useState('https://github.com/0HugoHu/Unraid-Docker-Controller.git');
+  const [updateBranch, setUpdateBranch] = useState('main');
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState('');
+  const healthPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     api.getStorage().then(setStorage).catch(console.error);
+    return () => {
+      if (healthPollRef.current) clearInterval(healthPollRef.current);
+    };
   }, []);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
@@ -83,6 +91,45 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
     }
   };
 
+  const handleSelfUpdate = async () => {
+    setIsUpdating(true);
+    setUpdateStatus('Checking for updates...');
+    try {
+      const check = await api.checkSelfUpdate(updateRepoUrl, updateBranch);
+      if (!check.hasUpdate) {
+        setUpdateStatus('Already up to date (' + check.localCommit + ')');
+        setIsUpdating(false);
+        return;
+      }
+      if (!confirm(
+        `Update available: ${check.localCommit} \u2192 ${check.remoteCommit}. Pull, rebuild, and restart the controller?`
+      )) {
+        setUpdateStatus('');
+        setIsUpdating(false);
+        return;
+      }
+      setUpdateStatus('Pulling source and building new image...');
+      await api.selfUpdate(updateRepoUrl, updateBranch);
+      setUpdateStatus('Update triggered. Waiting for controller to restart...');
+      // Poll health endpoint until the new container is up
+      healthPollRef.current = setInterval(async () => {
+        try {
+          const resp = await fetch('/api/v1/health');
+          if (resp.ok) {
+            if (healthPollRef.current) clearInterval(healthPollRef.current);
+            setUpdateStatus('Controller restarted successfully! Reloading...');
+            setTimeout(() => window.location.reload(), 1000);
+          }
+        } catch {
+          // Controller is still restarting
+        }
+      }, 3000);
+    } catch (err) {
+      setUpdateStatus(err instanceof Error ? err.message : 'Update failed');
+      setIsUpdating(false);
+    }
+  };
+
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -90,7 +137,7 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-4">
           <button
             onClick={onBack}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-500"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -112,7 +159,7 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600
-                         bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                         bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
               />
             </div>
             <div>
@@ -124,7 +171,7 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600
-                         bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                         bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
               />
             </div>
             <div>
@@ -136,19 +183,19 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600
-                         bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                         bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
               />
             </div>
             {passwordError && (
-              <p className="text-red-500 text-sm">{passwordError}</p>
+              <p className="text-red-600 dark:text-red-400 text-sm">{passwordError}</p>
             )}
             {passwordSuccess && (
-              <p className="text-green-500 text-sm">{passwordSuccess}</p>
+              <p className="text-emerald-600 dark:text-emerald-400 text-sm">{passwordSuccess}</p>
             )}
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white
-                       font-medium rounded-lg transition-colors"
+              className="px-4 py-2 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100
+                       text-white dark:text-gray-900 font-medium rounded-lg transition-colors"
             >
               Update Password
             </button>
@@ -177,7 +224,7 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
                   <button
                     onClick={handleClearLogs}
                     disabled={isClearingLogs}
-                    className="text-red-500 hover:text-red-600 text-sm"
+                    className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 text-sm transition-colors"
                   >
                     {isClearingLogs ? 'Clearing...' : 'Clear All'}
                   </button>
@@ -192,7 +239,7 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
                   <button
                     onClick={handlePruneImages}
                     disabled={isPruning}
-                    className="text-red-500 hover:text-red-600 text-sm"
+                    className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 text-sm transition-colors"
                   >
                     {isPruning ? 'Pruning...' : 'Prune Unused'}
                   </button>
@@ -202,11 +249,64 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
           )}
         </section>
 
+        {/* Update Controller */}
+        <section className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold mb-4">Update Controller</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">
+                Repository URL
+              </label>
+              <input
+                type="text"
+                value={updateRepoUrl}
+                onChange={(e) => setUpdateRepoUrl(e.target.value)}
+                disabled={isUpdating}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600
+                         bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400
+                         disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">
+                Branch
+              </label>
+              <input
+                type="text"
+                value={updateBranch}
+                onChange={(e) => setUpdateBranch(e.target.value)}
+                disabled={isUpdating}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600
+                         bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400
+                         disabled:opacity-50"
+              />
+            </div>
+            {updateStatus && (
+              <p className={`text-sm ${isUpdating ? 'text-gray-500 dark:text-gray-400' : 'text-red-600 dark:text-red-400'}`}>
+                {updateStatus}
+              </p>
+            )}
+            <button
+              onClick={handleSelfUpdate}
+              disabled={isUpdating}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800
+                       dark:bg-white dark:hover:bg-gray-100
+                       text-white dark:text-gray-900 font-medium rounded-lg transition-colors
+                       disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`} />
+              {isUpdating ? 'Updating...' : 'Check for Updates'}
+            </button>
+          </div>
+        </section>
+
         {/* Logout */}
         <button
           onClick={onLogout}
           className="w-full flex items-center justify-center gap-2 px-4 py-3
-                   bg-red-500 hover:bg-red-600 text-white font-medium rounded-xl transition-colors"
+                   border border-gray-300 dark:border-gray-600
+                   text-gray-700 dark:text-gray-300 font-medium rounded-xl
+                   hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
         >
           <LogOut className="w-4 h-4" />
           Logout

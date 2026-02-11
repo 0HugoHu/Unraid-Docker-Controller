@@ -86,6 +86,11 @@ export const api = {
   pullAndRebuild: (id: string) =>
     fetchAPI(`/apps/${id}/pull`, { method: 'POST' }),
 
+  checkAppUpdate: (id: string) =>
+    fetchAPI<{ hasUpdate: boolean; localCommit: string; remoteCommit: string }>(
+      `/apps/${id}/check-update`
+    ),
+
   getLogs: (id: string, lines = 100) =>
     fetchAPI<{ logs: string }>(`/apps/${id}/logs?lines=${lines}`),
 
@@ -108,6 +113,21 @@ export const api = {
   pruneImages: () => fetchAPI<{ spaceReclaimed: number }>('/system/prune', { method: 'POST' }),
 
   clearAllLogs: () => fetchAPI('/system/logs', { method: 'DELETE' }),
+
+  checkSelfUpdate: (repoUrl?: string, branch?: string) =>
+    fetchAPI<{ hasUpdate: boolean; localCommit: string; remoteCommit: string }>(
+      '/system/check-update',
+      {
+        method: 'POST',
+        body: JSON.stringify({ repoUrl, branch }),
+      }
+    ),
+
+  selfUpdate: (repoUrl?: string, branch?: string) =>
+    fetchAPI<{ message: string }>('/system/self-update', {
+      method: 'POST',
+      body: JSON.stringify({ repoUrl, branch }),
+    }),
 };
 
 export interface App {

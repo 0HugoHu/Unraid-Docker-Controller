@@ -51,7 +51,7 @@ export default function Dashboard({ onSettings }: DashboardProps) {
           <h1 className="text-xl font-bold">NAS Controller</h1>
           <button
             onClick={onSettings}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-500 dark:text-gray-400"
           >
             <Settings className="w-5 h-5" />
           </button>
@@ -64,22 +64,22 @@ export default function Dashboard({ onSettings }: DashboardProps) {
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-6 shadow-sm border border-gray-200 dark:border-gray-700">
             <div className="flex flex-wrap gap-4 text-sm">
               <div className="flex items-center gap-2">
-                <Database className="w-4 h-4 text-blue-500" />
+                <Database className="w-4 h-4 text-gray-400" />
                 <span className="text-gray-500 dark:text-gray-400">DB:</span>
                 <span className="font-medium">{formatBytes(storage.database)}</span>
               </div>
               <div className="flex items-center gap-2">
-                <FolderGit2 className="w-4 h-4 text-green-500" />
+                <FolderGit2 className="w-4 h-4 text-gray-400" />
                 <span className="text-gray-500 dark:text-gray-400">Repos:</span>
                 <span className="font-medium">{formatBytes(storage.repositories)}</span>
               </div>
               <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-yellow-500" />
+                <FileText className="w-4 h-4 text-gray-400" />
                 <span className="text-gray-500 dark:text-gray-400">Logs:</span>
                 <span className="font-medium">{formatBytes(storage.logs)}</span>
               </div>
               <div className="flex items-center gap-2">
-                <HardDrive className="w-4 h-4 text-purple-500" />
+                <HardDrive className="w-4 h-4 text-gray-400" />
                 <span className="text-gray-500 dark:text-gray-400">Images:</span>
                 <span className="font-medium">{formatBytes(storage.images)}</span>
               </div>
@@ -91,8 +91,9 @@ export default function Dashboard({ onSettings }: DashboardProps) {
         <div className="flex items-center justify-between mb-6">
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600
-                     text-white font-medium rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800
+                     dark:bg-white dark:hover:bg-gray-100
+                     text-white dark:text-gray-900 font-medium rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
             Add New App
@@ -105,14 +106,14 @@ export default function Dashboard({ onSettings }: DashboardProps) {
         {/* Apps List */}
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
           </div>
         ) : apps.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-500 dark:text-gray-400 mb-4">No apps yet</p>
             <button
               onClick={() => setShowAddModal(true)}
-              className="text-blue-500 hover:underline"
+              className="text-gray-700 dark:text-gray-300 hover:underline"
             >
               Add your first app
             </button>
