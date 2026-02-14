@@ -171,6 +171,9 @@ func (h *AppHandler) UpdateApp(c *gin.Context) {
 	if req.BuildArgs != nil {
 		app.BuildArgs = req.BuildArgs
 	}
+	if req.Volumes != nil {
+		app.Volumes = req.Volumes
+	}
 
 	if err := h.appManager.UpdateApp(app); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

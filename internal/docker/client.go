@@ -102,7 +102,7 @@ func (c *Client) BuildImage(ctx context.Context, contextPath string, dockerfileP
 	return nil
 }
 
-func (c *Client) CreateContainer(ctx context.Context, name string, imageName string, internalPort int, externalPort int, env map[string]string, restartPolicy string) (string, error) {
+func (c *Client) CreateContainer(ctx context.Context, name string, imageName string, internalPort int, externalPort int, env map[string]string, restartPolicy string, volumes []string) (string, error) {
 	// Convert env map to slice
 	envSlice := make([]string, 0, len(env))
 	for k, v := range env {
@@ -145,6 +145,7 @@ func (c *Client) CreateContainer(ctx context.Context, name string, imageName str
 	hostConfig := &container.HostConfig{
 		PortBindings:  portBindings,
 		RestartPolicy: restartPolicyConfig,
+		Binds:         volumes,
 	}
 
 	resp, err := c.cli.ContainerCreate(ctx, config, hostConfig, &network.NetworkingConfig{}, nil, name)

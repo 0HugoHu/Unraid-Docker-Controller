@@ -37,7 +37,8 @@ type App struct {
 	ExternalPort  int            `json:"externalPort"`
 	RestartPolicy string         `json:"restartPolicy"`
 
-	Env map[string]string `json:"env"`
+	Env     map[string]string `json:"env"`
+	Volumes []string          `json:"volumes"`
 
 	Status            AppStatus  `json:"status"`
 	LastBuild         *time.Time `json:"lastBuild"`
@@ -55,6 +56,7 @@ type AppManifest struct {
 	Icon        string            `json:"icon"`
 	DefaultPort int               `json:"defaultPort"`
 	Env         map[string]string `json:"env"`
+	Volumes     []string          `json:"volumes,omitempty"`
 }
 
 type CreateAppRequest struct {
@@ -70,6 +72,7 @@ type ConfigureAppRequest struct {
 	ExternalPort   int               `json:"externalPort"`
 	Env            map[string]string `json:"env"`
 	BuildArgs      map[string]string `json:"buildArgs"`
+	Volumes        []string          `json:"volumes,omitempty"`
 }
 
 type CloneResult struct {

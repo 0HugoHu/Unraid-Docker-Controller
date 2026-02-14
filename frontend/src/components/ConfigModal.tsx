@@ -18,6 +18,7 @@ export default function ConfigModal({ appId, onClose, onSave }: ConfigModalProps
   const [internalPort, setInternalPort] = useState(80);
   const [externalPort, setExternalPort] = useState(0);
   const [envVars, setEnvVars] = useState<{ key: string; value: string }[]>([]);
+  const [volumes, setVolumes] = useState<{ host: string; container: string }[]>([]);
 
   useEffect(() => {
     const fetchApp = async () => {
@@ -32,6 +33,12 @@ export default function ConfigModal({ appId, onClose, onSave }: ConfigModalProps
             key,
             value,
           }))
+        );
+        setVolumes(
+          (data.app.volumes || []).map((v) => {
+            const [host, container] = v.split(':');
+            return { host, container: container || '' };
+          })
         );
       } catch (err) {
         setError('Failed to load app');
@@ -55,11 +62,16 @@ export default function ConfigModal({ appId, onClose, onSave }: ConfigModalProps
         }
       });
 
+      const volumeStrings = volumes
+        .filter((v) => v.host.trim() && v.container.trim())
+        .map((v) => `${v.host.trim()}:${v.container.trim()}`);
+
       await api.updateApp(appId, {
         name,
         internalPort,
         externalPort,
         env,
+        volumes: volumeStrings,
       });
 
       onSave();
@@ -82,6 +94,20 @@ export default function ConfigModal({ appId, onClose, onSave }: ConfigModalProps
 
   const removeEnvVar = (index: number) => {
     setEnvVars(envVars.filter((_, i) => i !== index));
+  };
+
+  const addVolume = () => {
+    setVolumes([...volumes, { host: '', container: '' }]);
+  };
+
+  const updateVolume = (index: number, field: 'host' | 'container', value: string) => {
+    const updated = [...volumes];
+    updated[index][field] = value;
+    setVolumes(updated);
+  };
+
+  const removeVolume = (index: number) => {
+    setVolumes(volumes.filter((_, i) => i !== index));
   };
 
   if (isLoading) {
@@ -196,6 +222,54 @@ export default function ConfigModal({ appId, onClose, onSave }: ConfigModalProps
               </div>
             ) : (
               <p className="text-sm text-gray-400">No environment variables</p>
+            )}
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm text-gray-500 dark:text-gray-400">
+                Volume Mounts
+              </label>
+              <button
+                type="button"
+                onClick={addVolume}
+                className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                + Add
+              </button>
+            </div>
+            {volumes.length > 0 ? (
+              <div className="space-y-2">
+                {volumes.map((vol, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={vol.host}
+                      onChange={(e) => updateVolume(index, 'host', e.target.value)}
+                      placeholder="Host path"
+                      className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600
+                               bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400 text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={vol.container}
+                      onChange={(e) => updateVolume(index, 'container', e.target.value)}
+                      placeholder="Container path"
+                      className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600
+                               bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeVolume(index)}
+                      className="px-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">No volume mounts</p>
             )}
           </div>
 

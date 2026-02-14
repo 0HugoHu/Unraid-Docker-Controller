@@ -118,6 +118,18 @@ func (m *AppManager) CreateApp(repoURL string, branch string, config *models.Con
 		buildArgs = config.BuildArgs
 	}
 
+	// Merge volumes: manifest first, then config overrides/appends
+	var volumes []string
+	if cloneResult.Manifest != nil && cloneResult.Manifest.Volumes != nil {
+		volumes = append(volumes, cloneResult.Manifest.Volumes...)
+	}
+	if config.Volumes != nil {
+		volumes = append(volumes, config.Volumes...)
+	}
+	if volumes == nil {
+		volumes = []string{}
+	}
+
 	now := time.Now()
 	commit, _ := m.gitService.GetLastCommit(cloneResult.Slug)
 
@@ -139,6 +151,7 @@ func (m *AppManager) CreateApp(repoURL string, branch string, config *models.Con
 		ExternalPort:   port,
 		RestartPolicy:  "unless-stopped",
 		Env:            env,
+		Volumes:        volumes,
 		Status:         models.StatusStopped,
 		CreatedAt:      now,
 		UpdatedAt:      now,
@@ -223,6 +236,7 @@ func (m *AppManager) StartApp(ctx context.Context, appID string) error {
 		app.ExternalPort,
 		app.Env,
 		app.RestartPolicy,
+		app.Volumes,
 	)
 	if err != nil {
 		app.Status = models.StatusError

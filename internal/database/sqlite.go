@@ -59,7 +59,8 @@ func (db *DB) migrate() error {
 		last_build_success INTEGER DEFAULT 0,
 		image_size INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		volumes TEXT DEFAULT '[]'
 	);
 
 	CREATE TABLE IF NOT EXISTS sessions (
@@ -74,26 +75,34 @@ func (db *DB) migrate() error {
 	`
 
 	_, err := db.conn.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Migrations
+	db.conn.Exec("ALTER TABLE apps ADD COLUMN volumes TEXT DEFAULT '[]'")
+
+	return nil
 }
 
 func (db *DB) CreateApp(app *models.App) error {
 	buildArgsJSON, _ := json.Marshal(app.BuildArgs)
 	envJSON, _ := json.Marshal(app.Env)
+	volumesJSON, _ := json.Marshal(app.Volumes)
 
 	_, err := db.conn.Exec(`
 		INSERT INTO apps (
 			id, name, slug, description, icon, repo_url, branch, last_commit, last_pulled,
 			dockerfile_path, build_context, build_args, image_name, container_name, container_id,
 			internal_port, external_port, restart_policy, env, status, last_build,
-			last_build_duration, last_build_success, image_size, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			last_build_duration, last_build_success, image_size, created_at, updated_at, volumes
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		app.ID, app.Name, app.Slug, app.Description, app.Icon, app.RepoURL, app.Branch,
 		app.LastCommit, app.LastPulled, app.DockerfilePath, app.BuildContext, string(buildArgsJSON),
 		app.ImageName, app.ContainerName, app.ContainerID, app.InternalPort, app.ExternalPort,
 		app.RestartPolicy, string(envJSON), app.Status, app.LastBuild, app.LastBuildDuration,
-		app.LastBuildSuccess, app.ImageSize, app.CreatedAt, app.UpdatedAt,
+		app.LastBuildSuccess, app.ImageSize, app.CreatedAt, app.UpdatedAt, string(volumesJSON),
 	)
 	return err
 }
@@ -101,6 +110,7 @@ func (db *DB) CreateApp(app *models.App) error {
 func (db *DB) UpdateApp(app *models.App) error {
 	buildArgsJSON, _ := json.Marshal(app.BuildArgs)
 	envJSON, _ := json.Marshal(app.Env)
+	volumesJSON, _ := json.Marshal(app.Volumes)
 
 	_, err := db.conn.Exec(`
 		UPDATE apps SET
@@ -108,14 +118,16 @@ func (db *DB) UpdateApp(app *models.App) error {
 			last_pulled = ?, dockerfile_path = ?, build_context = ?, build_args = ?,
 			image_name = ?, container_name = ?, container_id = ?, internal_port = ?,
 			external_port = ?, restart_policy = ?, env = ?, status = ?, last_build = ?,
-			last_build_duration = ?, last_build_success = ?, image_size = ?, updated_at = ?
+			last_build_duration = ?, last_build_success = ?, image_size = ?, updated_at = ?,
+			volumes = ?
 		WHERE id = ?
 	`,
 		app.Name, app.Description, app.Icon, app.RepoURL, app.Branch, app.LastCommit,
 		app.LastPulled, app.DockerfilePath, app.BuildContext, string(buildArgsJSON),
 		app.ImageName, app.ContainerName, app.ContainerID, app.InternalPort,
 		app.ExternalPort, app.RestartPolicy, string(envJSON), app.Status, app.LastBuild,
-		app.LastBuildDuration, app.LastBuildSuccess, app.ImageSize, time.Now(), app.ID,
+		app.LastBuildDuration, app.LastBuildSuccess, app.ImageSize, time.Now(),
+		string(volumesJSON), app.ID,
 	)
 	return err
 }
@@ -173,7 +185,7 @@ func (db *DB) GetUsedPorts() ([]int, error) {
 
 func (db *DB) scanApp(row *sql.Row) (*models.App, error) {
 	app := &models.App{}
-	var buildArgsJSON, envJSON string
+	var buildArgsJSON, envJSON, volumesJSON string
 	var lastPulled, lastBuild sql.NullTime
 	var lastBuildSuccess int
 	var containerID sql.NullString
@@ -183,7 +195,7 @@ func (db *DB) scanApp(row *sql.Row) (*models.App, error) {
 		&app.LastCommit, &lastPulled, &app.DockerfilePath, &app.BuildContext, &buildArgsJSON,
 		&app.ImageName, &app.ContainerName, &containerID, &app.InternalPort, &app.ExternalPort,
 		&app.RestartPolicy, &envJSON, &app.Status, &lastBuild, &app.LastBuildDuration,
-		&lastBuildSuccess, &app.ImageSize, &app.CreatedAt, &app.UpdatedAt,
+		&lastBuildSuccess, &app.ImageSize, &app.CreatedAt, &app.UpdatedAt, &volumesJSON,
 	)
 	if err != nil {
 		return nil, err
@@ -201,6 +213,7 @@ func (db *DB) scanApp(row *sql.Row) (*models.App, error) {
 	app.LastBuildSuccess = lastBuildSuccess == 1
 	json.Unmarshal([]byte(buildArgsJSON), &app.BuildArgs)
 	json.Unmarshal([]byte(envJSON), &app.Env)
+	json.Unmarshal([]byte(volumesJSON), &app.Volumes)
 
 	if app.BuildArgs == nil {
 		app.BuildArgs = make(map[string]string)
@@ -208,13 +221,16 @@ func (db *DB) scanApp(row *sql.Row) (*models.App, error) {
 	if app.Env == nil {
 		app.Env = make(map[string]string)
 	}
+	if app.Volumes == nil {
+		app.Volumes = []string{}
+	}
 
 	return app, nil
 }
 
 func (db *DB) scanAppRows(rows *sql.Rows) (*models.App, error) {
 	app := &models.App{}
-	var buildArgsJSON, envJSON string
+	var buildArgsJSON, envJSON, volumesJSON string
 	var lastPulled, lastBuild sql.NullTime
 	var lastBuildSuccess int
 	var containerID sql.NullString
@@ -224,7 +240,7 @@ func (db *DB) scanAppRows(rows *sql.Rows) (*models.App, error) {
 		&app.LastCommit, &lastPulled, &app.DockerfilePath, &app.BuildContext, &buildArgsJSON,
 		&app.ImageName, &app.ContainerName, &containerID, &app.InternalPort, &app.ExternalPort,
 		&app.RestartPolicy, &envJSON, &app.Status, &lastBuild, &app.LastBuildDuration,
-		&lastBuildSuccess, &app.ImageSize, &app.CreatedAt, &app.UpdatedAt,
+		&lastBuildSuccess, &app.ImageSize, &app.CreatedAt, &app.UpdatedAt, &volumesJSON,
 	)
 	if err != nil {
 		return nil, err
@@ -242,12 +258,16 @@ func (db *DB) scanAppRows(rows *sql.Rows) (*models.App, error) {
 	app.LastBuildSuccess = lastBuildSuccess == 1
 	json.Unmarshal([]byte(buildArgsJSON), &app.BuildArgs)
 	json.Unmarshal([]byte(envJSON), &app.Env)
+	json.Unmarshal([]byte(volumesJSON), &app.Volumes)
 
 	if app.BuildArgs == nil {
 		app.BuildArgs = make(map[string]string)
 	}
 	if app.Env == nil {
 		app.Env = make(map[string]string)
+	}
+	if app.Volumes == nil {
+		app.Volumes = []string{}
 	}
 
 	return app, nil

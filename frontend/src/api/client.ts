@@ -144,6 +144,7 @@ export interface App {
   internalPort: number;
   externalPort: number;
   env: Record<string, string>;
+  volumes: string[];
   status: 'stopped' | 'running' | 'building' | 'build-failed' | 'starting' | 'error';
   lastBuild: string | null;
   lastBuildDuration: string;
@@ -164,6 +165,7 @@ export interface CloneResult {
     description?: string;
     defaultPort?: number;
     env?: Record<string, string>;
+    volumes?: string[];
   } | null;
   suggestedPort: number;
 }
@@ -176,6 +178,7 @@ export interface AppConfig {
   externalPort?: number;
   env?: Record<string, string>;
   buildArgs?: Record<string, string>;
+  volumes?: string[];
 }
 
 export interface SystemInfo {
