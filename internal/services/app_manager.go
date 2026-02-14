@@ -118,13 +118,13 @@ func (m *AppManager) CreateApp(repoURL string, branch string, config *models.Con
 		buildArgs = config.BuildArgs
 	}
 
-	// Merge volumes: manifest first, then config overrides/appends
+	// Volumes: config takes precedence (frontend pre-populates from manifest),
+	// fall back to manifest if config has none
 	var volumes []string
-	if cloneResult.Manifest != nil && cloneResult.Manifest.Volumes != nil {
-		volumes = append(volumes, cloneResult.Manifest.Volumes...)
-	}
 	if config.Volumes != nil {
-		volumes = append(volumes, config.Volumes...)
+		volumes = config.Volumes
+	} else if cloneResult.Manifest != nil && cloneResult.Manifest.Volumes != nil {
+		volumes = cloneResult.Manifest.Volumes
 	}
 	if volumes == nil {
 		volumes = []string{}
