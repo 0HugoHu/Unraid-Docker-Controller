@@ -11,6 +11,7 @@ export default function AddAppModal({ onClose, onSuccess }: AddAppModalProps) {
   const [step, setStep] = useState<'url' | 'configure'>('url');
   const [repoUrl, setRepoUrl] = useState('');
   const [branch, setBranch] = useState('main');
+  const isLocal = repoUrl.startsWith('/mnt/user/3_secret/');
   const [isCloning, setIsCloning] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
@@ -28,7 +29,7 @@ export default function AddAppModal({ onClose, onSuccess }: AddAppModalProps) {
     setIsCloning(true);
 
     try {
-      const result = await api.cloneRepo(repoUrl, branch);
+      const result = await api.cloneRepo(repoUrl, isLocal ? 'local' : branch);
       setCloneResult(result);
       setName(result.name);
       if (result.suggestedPort) {
@@ -75,7 +76,7 @@ export default function AddAppModal({ onClose, onSuccess }: AddAppModalProps) {
         .filter((v) => v.host.trim() && v.container.trim())
         .map((v) => `${v.host.trim()}:${v.container.trim()}`);
 
-      await api.createApp(repoUrl, branch, {
+      await api.createApp(repoUrl, isLocal ? 'local' : branch, {
         name,
         internalPort,
         env,
@@ -136,36 +137,38 @@ export default function AddAppModal({ onClose, onSuccess }: AddAppModalProps) {
             <form onSubmit={handleClone} className="space-y-4">
               <div>
                 <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">
-                  GitHub URL
+                  GitHub URL or local path
                 </label>
                 <input
-                  type="url"
+                  type="text"
                   value={repoUrl}
                   onChange={(e) => setRepoUrl(e.target.value)}
-                  placeholder="https://github.com/username/repo"
+                  placeholder="https://github.com/user/repo  or  /mnt/user/3_secret/my-app"
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600
                            bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
                   required
                 />
               </div>
 
-              <div>
-                <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">
-                  Branch
-                </label>
-                <div className="relative">
-                  <GitBranch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={branch}
-                    onChange={(e) => setBranch(e.target.value)}
-                    placeholder="main"
-                    className="w-full pl-10 pr-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600
-                             bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
-                    required
-                  />
+              {!isLocal && (
+                <div>
+                  <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">
+                    Branch
+                  </label>
+                  <div className="relative">
+                    <GitBranch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={branch}
+                      onChange={(e) => setBranch(e.target.value)}
+                      placeholder="main"
+                      className="w-full pl-10 pr-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600
+                               bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {error && (
                 <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
@@ -173,7 +176,7 @@ export default function AddAppModal({ onClose, onSuccess }: AddAppModalProps) {
 
               <button
                 type="submit"
-                disabled={isCloning || !repoUrl || !branch}
+                disabled={isCloning || !repoUrl || (!isLocal && !branch)}
                 className="w-full py-2 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300
                          dark:bg-white dark:hover:bg-gray-100 dark:disabled:bg-gray-600
                          text-white dark:text-gray-900 font-medium rounded-lg transition-colors
@@ -182,10 +185,10 @@ export default function AddAppModal({ onClose, onSuccess }: AddAppModalProps) {
                 {isCloning ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Cloning...
+                    {isLocal ? 'Loading...' : 'Cloning...'}
                   </>
                 ) : (
-                  'Clone & Verify'
+                  isLocal ? 'Load & Verify' : 'Clone & Verify'
                 )}
               </button>
             </form>
