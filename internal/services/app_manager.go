@@ -131,7 +131,10 @@ func (m *AppManager) CreateApp(repoURL string, branch string, config *models.Con
 	}
 
 	now := time.Now()
-	commit, _ := m.gitService.GetLastCommit(cloneResult.Slug)
+	commit := "local"
+	if !IsLocalPath(repoURL) {
+		commit, _ = m.gitService.GetLastCommit(cloneResult.Slug)
+	}
 
 	app := &models.App{
 		ID:             uuid.New().String(),
@@ -175,6 +178,9 @@ func (m *AppManager) BuildApp(ctx context.Context, appID string, progressChan ch
 	m.db.UpdateApp(app)
 
 	repoPath := m.gitService.GetRepoPath(app.Slug)
+	if IsLocalPath(app.RepoURL) {
+		repoPath = app.RepoURL
+	}
 	buildContext := filepath.Join(repoPath, app.BuildContext)
 
 	startTime := time.Now()
@@ -310,8 +316,10 @@ func (m *AppManager) DeleteApp(ctx context.Context, appID string) error {
 	// Remove image
 	m.dockerClient.RemoveImage(ctx, app.ImageName)
 
-	// Remove repo
-	m.gitService.RemoveRepo(app.Slug)
+	// Remove cloned repo (skip for local-path apps — source directory is not ours to delete)
+	if !IsLocalPath(app.RepoURL) {
+		m.gitService.RemoveRepo(app.Slug)
+	}
 
 	// Remove build logs
 	m.buildService.ClearBuildLog(app.ID)
@@ -333,14 +341,15 @@ func (m *AppManager) PullAndRebuild(ctx context.Context, appID string, progressC
 		m.StopApp(ctx, appID)
 	}
 
-	// Pull latest changes
-	commit, err := m.gitService.PullRepo(app.Slug, app.Branch)
-	if err != nil {
-		return fmt.Errorf("failed to pull repo: %v", err)
-	}
-
+	// Pull latest changes (skip for local-path apps — source is managed externally)
 	now := time.Now()
-	app.LastCommit = commit[:8]
+	if !IsLocalPath(app.RepoURL) {
+		commit, err := m.gitService.PullRepo(app.Slug, app.Branch)
+		if err != nil {
+			return fmt.Errorf("failed to pull repo: %v", err)
+		}
+		app.LastCommit = commit[:8]
+	}
 	app.LastPulled = &now
 	m.db.UpdateApp(app)
 
@@ -360,6 +369,9 @@ func (m *AppManager) CheckAppUpdate(appID string) (*UpdateCheckResult, error) {
 	app, err := m.db.GetApp(appID)
 	if err != nil {
 		return nil, fmt.Errorf("app not found: %v", err)
+	}
+	if IsLocalPath(app.RepoURL) {
+		return &UpdateCheckResult{HasUpdate: false, LocalCommit: "local", RemoteCommit: "local"}, nil
 	}
 	return m.gitService.CheckForUpdates(app.Slug, app.Branch)
 }

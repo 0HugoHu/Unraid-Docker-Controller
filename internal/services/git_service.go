@@ -27,7 +27,21 @@ func NewGitService(dataDir string) *GitService {
 	}
 }
 
+// allowedLocalPathPrefix is the only host path the tool is permitted to use
+// as a local source directory. Enforced at the API boundary so no arbitrary
+// path can be supplied through the UI.
+const allowedLocalPathPrefix = "/mnt/user/3_secret/"
+
+// IsLocalPath reports whether repoURL is a permitted local filesystem path.
+func IsLocalPath(repoURL string) bool {
+	return strings.HasPrefix(repoURL, allowedLocalPathPrefix)
+}
+
 func (s *GitService) CloneRepo(repoURL string, branch string) (*models.CloneResult, error) {
+	if IsLocalPath(repoURL) {
+		return s.validateLocalPath(repoURL)
+	}
+
 	// Extract slug from URL
 	slug := s.extractSlug(repoURL)
 	if slug == "" {
@@ -102,6 +116,62 @@ func (s *GitService) CloneRepo(repoURL string, branch string) (*models.CloneResu
 		result.SuggestedPort = manifest.DefaultPort
 	}
 
+	return result, nil
+}
+
+// validateLocalPath validates a permitted local directory as a build source,
+// reading its Dockerfile and nas-controller.json without cloning anything.
+func (s *GitService) validateLocalPath(localPath string) (*models.CloneResult, error) {
+	if _, err := os.Stat(localPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("local path does not exist: %s", localPath)
+	}
+
+	slug := strings.ToLower(filepath.Base(localPath))
+
+	dockerfilePath := "./Dockerfile"
+	hasDockerfile := false
+	for _, p := range []string{
+		filepath.Join(localPath, "Dockerfile"),
+		filepath.Join(localPath, "dockerfile"),
+		filepath.Join(localPath, "docker", "Dockerfile"),
+	} {
+		if _, err := os.Stat(p); err == nil {
+			hasDockerfile = true
+			rel, _ := filepath.Rel(localPath, p)
+			dockerfilePath = "./" + filepath.ToSlash(rel)
+			break
+		}
+	}
+	if !hasDockerfile {
+		return nil, fmt.Errorf("no Dockerfile found in %s", localPath)
+	}
+
+	var manifest *models.AppManifest
+	if data, err := os.ReadFile(filepath.Join(localPath, "nas-controller.json")); err == nil {
+		manifest = &models.AppManifest{}
+		json.Unmarshal(data, manifest)
+	}
+
+	name, description := slug, ""
+	if manifest != nil && manifest.Name != "" {
+		name = manifest.Name
+	}
+	if manifest != nil && manifest.Description != "" {
+		description = manifest.Description
+	}
+
+	result := &models.CloneResult{
+		Slug:           slug,
+		Name:           name,
+		Description:    description,
+		HasDockerfile:  true,
+		DockerfilePath: dockerfilePath,
+		Manifest:       manifest,
+		SuggestedPort:  80,
+	}
+	if manifest != nil && manifest.DefaultPort > 0 {
+		result.SuggestedPort = manifest.DefaultPort
+	}
 	return result, nil
 }
 

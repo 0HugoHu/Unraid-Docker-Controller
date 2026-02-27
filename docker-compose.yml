@@ -9,6 +9,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - nas-controller-data:/data
+      - /mnt/user/3_secret:/mnt/user/3_secret:ro
     environment:
       - TZ=UTC
 
