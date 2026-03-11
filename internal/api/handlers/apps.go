@@ -144,6 +144,8 @@ func (h *AppHandler) UpdateApp(c *gin.Context) {
 		return
 	}
 
+	wasRunning := app.Status == models.StatusRunning
+
 	var req models.ConfigureAppRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
@@ -178,6 +180,16 @@ func (h *AppHandler) UpdateApp(c *gin.Context) {
 	if err := h.appManager.UpdateApp(app); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	// If the app was running, restart it in the background so the new config
+	// (port mappings, env vars, volumes) takes effect immediately.
+	if wasRunning {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			h.appManager.RestartApp(ctx, id)
+		}()
 	}
 
 	c.JSON(http.StatusOK, app)

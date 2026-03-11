@@ -71,6 +71,27 @@ func (p *PortAllocator) IsPortAvailable(port int) bool {
 	return !p.isPortInUse(port)
 }
 
+// IsPortAvailableForApp checks if a port is available, excluding the given app's own
+// port reservation. Use this when starting an app so its own DB entry doesn't block
+// it from reclaiming its assigned port.
+func (p *PortAllocator) IsPortAvailableForApp(port int, appID string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	usedPorts, err := p.db.GetUsedPortsExcluding(appID)
+	if err != nil {
+		return false
+	}
+
+	for _, used := range usedPorts {
+		if used == port {
+			return false
+		}
+	}
+
+	return !p.isPortInUse(port)
+}
+
 func (p *PortAllocator) FindNextAvailable(preferredPort int) (int, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -93,6 +114,40 @@ func (p *PortAllocator) FindNextAvailable(preferredPort int) (int, error) {
 	}
 
 	// Find next available
+	for port := PortRangeStart; port <= PortRangeEnd; port++ {
+		if usedSet[port] {
+			continue
+		}
+		if !p.isPortInUse(port) {
+			return port, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no available ports")
+}
+
+// FindNextAvailableForApp finds an available port, excluding the given app's own
+// port reservation from the "used" set.
+func (p *PortAllocator) FindNextAvailableForApp(preferredPort int, appID string) (int, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	usedPorts, err := p.db.GetUsedPortsExcluding(appID)
+	if err != nil {
+		return 0, err
+	}
+
+	usedSet := make(map[int]bool)
+	for _, port := range usedPorts {
+		usedSet[port] = true
+	}
+
+	if preferredPort >= PortRangeStart && preferredPort <= PortRangeEnd {
+		if !usedSet[preferredPort] && !p.isPortInUse(preferredPort) {
+			return preferredPort, nil
+		}
+	}
+
 	for port := PortRangeStart; port <= PortRangeEnd; port++ {
 		if usedSet[port] {
 			continue

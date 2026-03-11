@@ -240,6 +240,27 @@ func (c *Client) GetContainerByName(ctx context.Context, name string) (*types.Co
 	return nil, nil
 }
 
+// GetContainersOnPort returns all running containers bound to the given host port.
+func (c *Client) GetContainersOnPort(ctx context.Context, port int) ([]*types.Container, error) {
+	all, err := c.cli.ContainerList(ctx, container.ListOptions{All: true})
+	if err != nil {
+		return nil, err
+	}
+
+	portStr := fmt.Sprintf("%d", port)
+	var result []*types.Container
+	for i := range all {
+		for _, p := range all[i].Ports {
+			if int(p.PublicPort) == port || p.IP != "" && fmt.Sprintf("%d", p.PublicPort) == portStr {
+				copy := all[i]
+				result = append(result, &copy)
+				break
+			}
+		}
+	}
+	return result, nil
+}
+
 func (c *Client) GetDockerInfo(ctx context.Context) (map[string]interface{}, error) {
 	info, err := c.cli.Info(ctx)
 	if err != nil {

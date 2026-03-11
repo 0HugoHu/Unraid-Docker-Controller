@@ -215,17 +215,25 @@ func (m *AppManager) StartApp(ctx context.Context, appID string) error {
 		return fmt.Errorf("app not found: %v", err)
 	}
 
-	// Check if container exists
+	// Remove any existing container with this name (could be stopped or restarting)
 	existing, _ := m.dockerClient.GetContainerByName(ctx, app.ContainerName)
 	if existing != nil {
-		// Remove old container
 		m.dockerClient.StopContainer(ctx, existing.ID)
 		m.dockerClient.RemoveContainer(ctx, existing.ID, true)
 	}
 
-	// Check port availability and reassign if needed
-	if !m.portAllocator.IsPortAvailable(app.ExternalPort) {
-		newPort, err := m.portAllocator.FindNextAvailable(app.ExternalPort)
+	// Force-kill any stale containers occupying our target port that the DB
+	// doesn't recognise as legitimately running (e.g. orphans from a crash).
+	stale, _ := m.dockerClient.GetContainersOnPort(ctx, app.ExternalPort)
+	for _, sc := range stale {
+		m.dockerClient.StopContainer(ctx, sc.ID)
+		m.dockerClient.RemoveContainer(ctx, sc.ID, true)
+	}
+
+	// Check port availability excluding this app's own DB reservation so it
+	// always reclaims its assigned port instead of being bumped to a new one.
+	if !m.portAllocator.IsPortAvailableForApp(app.ExternalPort, app.ID) {
+		newPort, err := m.portAllocator.FindNextAvailableForApp(app.ExternalPort, app.ID)
 		if err != nil {
 			return fmt.Errorf("no available ports: %v", err)
 		}
@@ -273,15 +281,19 @@ func (m *AppManager) StopApp(ctx context.Context, appID string) error {
 		return fmt.Errorf("app not found: %v", err)
 	}
 
+	// Stop and remove by stored container ID first
 	if app.ContainerID != "" {
-		if err := m.dockerClient.StopContainer(ctx, app.ContainerID); err != nil {
-			// Container might not exist, try by name
-			if container, _ := m.dockerClient.GetContainerByName(ctx, app.ContainerName); container != nil {
-				m.dockerClient.StopContainer(ctx, container.ID)
-			}
-		}
+		m.dockerClient.StopContainer(ctx, app.ContainerID)
+		m.dockerClient.RemoveContainer(ctx, app.ContainerID, true)
 	}
 
+	// Also stop and remove by name in case the ID is stale
+	if container, _ := m.dockerClient.GetContainerByName(ctx, app.ContainerName); container != nil {
+		m.dockerClient.StopContainer(ctx, container.ID)
+		m.dockerClient.RemoveContainer(ctx, container.ID, true)
+	}
+
+	app.ContainerID = ""
 	app.Status = models.StatusStopped
 	m.db.UpdateApp(app)
 

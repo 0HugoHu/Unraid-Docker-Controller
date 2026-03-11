@@ -183,6 +183,24 @@ func (db *DB) GetUsedPorts() ([]int, error) {
 	return ports, nil
 }
 
+func (db *DB) GetUsedPortsExcluding(excludeAppID string) ([]int, error) {
+	rows, err := db.conn.Query(`SELECT external_port FROM apps WHERE external_port IS NOT NULL AND id != ?`, excludeAppID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ports []int
+	for rows.Next() {
+		var port int
+		if err := rows.Scan(&port); err != nil {
+			return nil, err
+		}
+		ports = append(ports, port)
+	}
+	return ports, nil
+}
+
 func (db *DB) scanApp(row *sql.Row) (*models.App, error) {
 	app := &models.App{}
 	var buildArgsJSON, envJSON, volumesJSON string
